@@ -13,12 +13,12 @@ full_DDP = false;
 DYNCST  = @(x,u,i) car_dyn_cst(x, u, full_DDP);
 T       = 500;              % horizon
 
-M = 50; % the number of multiple shooting
+M = 250; % the number of multiple shootinga
 x0      = [1;1;pi*3/2;0];   % initial state
-u0      = .1*randn(2,T);    % initial controls
+u0      = .1*ones(2,T);    % initial controls
 
-Op.plot = 0;               % plot the derivatives as well
-Op.maxIter = 100;
+Op.plot = 1;               % plot the derivatives as well
+Op.maxIter = 50;
 % prepare the visualization window and graphics callback
 figure(9);
 set(gcf,'name','car parking','Menu','none','NumberT','off')

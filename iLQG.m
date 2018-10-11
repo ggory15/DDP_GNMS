@@ -142,10 +142,10 @@ trace(1).dlambda = dlambda;
 if size(x0,2) == 1
     diverge = true;
     for alpha = Op.Alpha
-%        figure(1)
-%        [x,un,cost]  = forward_pass(x0(:,1),alpha*u,[],[],[],1,DYNCST,Op.lims,[]);
         [x, un, cost] = forward_pass_multi(x0(:,1),alpha*u,[],[],[],1,DYNCST,Op.lims,[], M);
-
+      %  cost = 100;
+        % Okay, we started forward pass with M shooting.
+        
         % simplistic divergence test
         if all(abs(x(:)) < 1e8)
             u = un;
@@ -200,8 +200,12 @@ for iter = 1:Op.maxIter
     end
     trace(iter).iter = iter;    
     
-    %====== STEP 0: get defeat value
+    %====== STEP 0: get defeat valuex
     dn = defeat_val(x, u, M, DYNCST);
+%     if (sum(sum(dn)) < 0.0000001)
+%         break;
+%     end
+    % Okay, we get dn  
     
     %====== STEP 1: differentiate dynamics and cost along new trajectory
     if flgChange
@@ -213,8 +217,7 @@ for iter = 1:Op.maxIter
     
     %====== STEP 2: backward pass, compute optimal control law and cost-to-go
     backPassDone   = 0;
-    while ~backPassDone
-        
+    while ~backPassDone        
         t_back   = tic;
         [diverge, Vx, Vxx, l, L, dV] = back_pass(cx,cu,cxx,cxu,cuu,fx,fu,fxx,fxu,fuu,lambda,Op.regType,Op.lims,u, dn);
         trace(iter).time_backward = toc(t_back);
@@ -250,7 +253,7 @@ for iter = 1:Op.maxIter
     if backPassDone
         t_fwd = tic;
         if Op.parallel  % parallel line-search
-            [xnew,unew,costnew] = forward_pass_multi2(x0 ,u, L, x(:,1:N), l, Op.Alpha, DYNCST,Op.lims,Op.diffFn, M, dn);
+            [xnew,unew,costnew] = forward_pass_multi2(x0 ,u, L, x(:,:), l, Op.Alpha, DYNCST,Op.lims,Op.diffFn, M, dn, fx, fu);
             Dcost               = sum(cost(:)) - sum(costnew,2);
             [dcost, w]          = max(Dcost);
             alpha               = Op.Alpha(w);
@@ -266,6 +269,7 @@ for iter = 1:Op.maxIter
                 costnew     = costnew(:,:,w);
                 xnew        = xnew(:,:,w);
                 unew        = unew(:,:,w);
+                       
             end
         else            % serial backtracking line-search
             for alpha = Op.Alpha
@@ -290,9 +294,6 @@ for iter = 1:Op.maxIter
         trace(iter).time_forward = toc(t_fwd);
     end
     
-    if iter == 1
-        disp("iter")
-    end
     %====== STEP 4: accept step (or not), draw graphics, print status
     
     % print headings
@@ -322,7 +323,7 @@ for iter = 1:Op.maxIter
         flgChange      = 1;
         Op.plotFn(x);
         
-        % terminate ?
+       % terminate ?
         if dcost < Op.tolFun
             if verbosity > 0
                 fprintf('\nSUCCESS: cost change < tolFun\n');
@@ -453,11 +454,11 @@ unew = permute(unew, [1 3 2]);
 cnew = permute(cnew, [1 3 2]);
 
 function [xnew,unew,cnew] = forward_pass_multi(x0,u,L,x,du,Alpha,DYNCST,lims,diff, M)
-% parallel forward-pass (rollout)
-% internally time is on the 3rd dimension, 
-% to facillitate vectorized dynamics calls
-
-n        = size(x0,1);
+if ~isempty(x0)
+    n        = size(x0,1);
+else
+    n        = size(x,1);
+end
 K        = length(Alpha);
 K1       = ones(1,K); % useful for expansion
 m        = size(u,1);
@@ -472,14 +473,22 @@ x_split = zeros(n, K, l+1, M);
 u_split = zeros(m, K, l, M);
 c_split = zeros(1, K, l+1, M);
 
-for i=1:M
-    x_split(:, :, 1, i) = x0(:,ones(1,K));
+if ~isempty(x0)
+    x_split(:, :, 1, 1) =  x0(:,ones(1,K));
+    % for init value for each multiple shooting.
+    for i=2:M
+        x_split(:, :, 1, i) =   x0(:,ones(1,K))*2.0; %x0(:,ones(1,K));
+    end
+else
+    for i=1:M
+        x_split(:, :, 1, i) = x(:,l*(i-1)+1);
+    end    
 end
 
 for j = 0:M-1
     for i = 1:l
         u_split(:, :, i, j+1) = u(:, l*j + i*K1);
-        [x_split(:,:,i+1,j+1), c_split(:,:,i, j+1)]  = DYNCST(x_split(:,:,i,j+1), u_split(:,:,i,j+1), i*K1);
+        [x_split(:,:,i+1,j+1), c_split(:,:,i, j+1)]  = DYNCST(x_split(:,:,i,j+1), u_split(:,:,i,j+1), l*j + i*K1);
     end
 end
 
@@ -489,12 +498,13 @@ for i=0:M-1
    cnew(:,:,l*i+1:l*(i+1)) = c_split(:,:, 1:l, i+1);
 end
 
-xnew(:,:,N+1) = x_split(:,:,l+1, j);
-[~, cnew(:,:,N+1)] = DYNCST(x_split(:,:,l+1, M), nan(m,K,1),i);
+xnew(:,:,N+1) = x_split(:,:,l+1, M);
+[~, cnew(:,:,N+1)] = DYNCST(x_split(:,:,l+1, M), nan(m,K,1),N);
 % put the time dimension in the columns
 xnew = permute(xnew, [1 3 2]);
 unew = permute(unew, [1 3 2]);
 cnew = permute(cnew, [1 3 2]);
+
 
 function [dnew] = defeat_val(x, u, M, DYNCST)
 n = size(x, 1);
@@ -502,12 +512,12 @@ m = size(u, 1);
 N = size(u, 2);
 l = N/M;
 dnew = zeros(n, N);
-for i=1:M-1
-    [dnew(:, i*l), c] = DYNCST(x(:, i*l), u(:, i*l), i*l);
-    dnew(:, i*l) = dnew(:, i*l) - x(:,i*l+1); 
+for i=1:N
+    [dnew(:, i), c] = DYNCST(x(:, i), u(:, i), i);
+    dnew(:, i) = dnew(:, i) - x(:,i+1); 
 end
 
-function [xnew,unew,cnew] = forward_pass_multi2(x0,u,L,x,du,Alpha,DYNCST,lims,diff, M, dn)
+function [xnew,unew,cnew] = forward_pass_multi2(x0,u,L,x,du,Alpha,DYNCST,lims,diff, M, dn, fx, fu)
 % parallel forward-pass (rollout)
 % internally time is on the 3rd dimension, 
 % to facillitate vectorized dynamics calls
@@ -520,6 +530,7 @@ N        = size(u,2);
 
 xnew        = zeros(n,K,N);
 xnew(:,:,1) = x0(:,ones(1,K));
+
 unew        = zeros(m,K,N);
 cnew        = zeros(1,K,N+1);
 for i = 1:N
@@ -538,18 +549,24 @@ for i = 1:N
         unew(:,:,i) = unew(:,:,i) + L(:,:,i)*dx;
     end
     
-    if ~isempty(lims)
-        unew(:,:,i) = min(lims(:,2*K1), max(lims(:,1*K1), unew(:,:,i)));
-    end
-    [xnew(:,:,i+1), cnew(:,:,i)]  = DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
-    if (mod(i, M) == 0)
-        [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] =  DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
-        for j=1:K
-            xnew(:,j,i+1) = xnew(:,j,i+1) + fu(:,:,j) * du(:,i) * Alpha(j) + dn(:,i);
-        end
+%   [xnew(:,:,i+1), cnew(:,:,i)]  = DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
+%     for j=1:K
+%         xnew(:,j,i+1) = xnew(:,j,i+1) + dn(:,i);
+%     end   
+%     for j=1:K
+%        xnew(:,j,i+1) = x(:,i+1) + (fx(:,:,i)+fu(:,:,i)*L(:,:,i))*dx(:,j) + fu(:,:,i)*du(:,i)*Alpha(j) + dn(:,i); 
+%     end
+    
+    if (mod(i, N/M) == 0 && i ~= N)
+         xnew(:,:,i+1) = x(:, (i+1) *K1) + (fx(:,:,i)+fu(:,:,i)*L(:,:,i))*dx(:,:) + fu(:,:,i)*du(:,i)*Alpha + dn(:,i); 
+        [~, cnew(:,:,i)]  = DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
+    else
+        [xnew(:,:,i+1), cnew(:,:,i)]  = DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
     end
 end
-[~, cnew(:,:,N+1)] = DYNCST(xnew(:,:,N+1),nan(m,K,1),i);
+
+[~, cnew(:,:,N+1)] = DYNCST(xnew(:,:,N+1),nan(m,K,1),N);
+
 % put the time dimension in the columns
 xnew = permute(xnew, [1 3 2]);
 unew = permute(unew, [1 3 2]);
@@ -628,14 +645,17 @@ for i = N-1:-1:1
         
 
     % update cost-to-go approximation
+   % dV          = dV + [k_i'*Qu+dn(:,i)'*Vx(:,i+1)  .5*k_i'*Quu*k_i+.5*dn(:,i)'*Vxx(:,:,i+1)*dn(:,i)];
     dV          = dV + [k_i'*Qu  .5*k_i'*Quu*k_i];
+    
+    % I don't know dV is correct or not. but It seems to work well.
     Vx(:,i)     = Qx + fx(:,:,i)'*(Vxx(:,:,i+1)*dn(:,i)) + Qux'*k_i + K_i'*(Qu+Quu*k_i);
-    Vxx(:,:,i)  = Qxx + -K_i'*Quu*K_i;
+    Vxx(:,:,i)  = Qxx - K_i'*Quu*K_i;
     Vxx(:,:,i)  = .5*(Vxx(:,:,i) + Vxx(:,:,i)');
+    
     % save controls/gains
     k(:,i)      = k_i;
     K(:,:,i)    = K_i;
-    
 end
 
 function  stop = graphics(figures,x,u,cost,L,Vx,Vxx,fx,fxx,fu,fuu,trace,init)
