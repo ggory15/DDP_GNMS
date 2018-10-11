@@ -1,3 +1,17 @@
-This is DDP with multi-shooting method.
+This is DDP with multi-shooting method[1].
 
-This code is based on 
+This code is based on https://kr.mathworks.com/matlabcentral/fileexchange/52069-ilqg-ddp-trajectory-optimization [2].
+
+How to Use it
+(1) open the demo_car.m
+(2) Set M value 
+    (if M = 500 -> DDP with Single shooting)
+    (if M = 50 -> DDP with multiple shooting(10))
+(3) Enjoy this.
+
+ps. If you find some bugs in this code, plz send to me by mail (ggory15@snu.ac.kr)
+
+[1] A Family of Iterative Gauss-Newton Shooting Methods for Nonlinear Optimal Control
+(https://arxiv.org/abs/1711.11006) 
+[2] Control-Limited Differential Dynamic Programming
+(https://homes.cs.washington.edu/~todorov/papers/TassaICRA14.pdf)
