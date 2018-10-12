@@ -143,7 +143,7 @@ if size(x0,2) == 1
     diverge = true;
     for alpha = Op.Alpha
         [x, un, cost] = forward_pass_multi(x0(:,1),alpha*u,[],[],[],1,DYNCST,Op.lims,[], M);
-      %  cost = 100;
+        cost = 100;
         % Okay, we started forward pass with M shooting.
         
         % simplistic divergence test
@@ -202,8 +202,10 @@ for iter = 1:Op.maxIter
     
     %====== STEP 0: get defeat valuex
     dn = defeat_val(x, u, M, DYNCST);
-%     if (sum(sum(dn)) < 0.0000001)
-%         break;
+%     if (sum(sum(dn)) < 0.1)
+%         disp("dn is too big");
+%         sum(sum(dn))
+%      %    break;
 %     end
     % Okay, we get dn  
     
@@ -253,7 +255,7 @@ for iter = 1:Op.maxIter
     if backPassDone
         t_fwd = tic;
         if Op.parallel  % parallel line-search
-            [xnew,unew,costnew] = forward_pass_multi2(x0 ,u, L, x(:,:), l, Op.Alpha, DYNCST,Op.lims,Op.diffFn, M, dn, fx, fu);
+            [xnew,unew,costnew] = forward_pass_multi2(x0 ,u, L, x(:,:), l, Op.Alpha, DYNCST, [],Op.diffFn, M, dn, fx, fu);
             Dcost               = sum(cost(:)) - sum(costnew,2);
             [dcost, w]          = max(Dcost);
             alpha               = Op.Alpha(w);
@@ -477,7 +479,7 @@ if ~isempty(x0)
     x_split(:, :, 1, 1) =  x0(:,ones(1,K));
     % for init value for each multiple shooting.
     for i=2:M
-        x_split(:, :, 1, i) =   x0(:,ones(1,K))*2.0; %x0(:,ones(1,K));
+        x_split(:, :, 1, i) =   randn(n,1); %x0(:,ones(1,K))*0.3;%zeros(n, 1); %x0(:,ones(1,K))*1.0; %x0(:,ones(1,K));
     end
 else
     for i=1:M
@@ -645,8 +647,8 @@ for i = N-1:-1:1
         
 
     % update cost-to-go approximation
-   % dV          = dV + [k_i'*Qu+dn(:,i)'*Vx(:,i+1)  .5*k_i'*Quu*k_i+.5*dn(:,i)'*Vxx(:,:,i+1)*dn(:,i)];
-    dV          = dV + [k_i'*Qu  .5*k_i'*Quu*k_i];
+    dV          = dV + [k_i'*Qu+dn(:,i)'*Vx(:,i+1)  .5*k_i'*Quu*k_i+.5*dn(:,i)'*Vxx(:,:,i+1)*dn(:,i)];
+    %dV          = dV + [k_i'*Qu  .5*k_i'*Quu*k_i];
     
     % I don't know dV is correct or not. but It seems to work well.
     Vx(:,i)     = Qx + fx(:,:,i)'*(Vxx(:,:,i+1)*dn(:,i)) + Qux'*k_i + K_i'*(Qu+Quu*k_i);
