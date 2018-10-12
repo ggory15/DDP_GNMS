@@ -5,8 +5,8 @@ This code is based on https://kr.mathworks.com/matlabcentral/fileexchange/52069-
 How to Use it
 (1) open the demo_car.m
 (2) Set M value 
-    (if M = 500 -> DDP with Single shooting)
-    (if M = 50 -> DDP with multiple shooting(10))
+    (if M = 2 -> DDP with multiple shooting(2))
+    (if M = 50 -> DDP with multiple shooting(50))
 (3) Enjoy this.
 
 ps. If you find some bugs in this code, plz send to me by mail (ggory15@snu.ac.kr)
