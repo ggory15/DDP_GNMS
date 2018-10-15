@@ -11,8 +11,11 @@ This code is based on https://kr.mathworks.com/matlabcentral/fileexchange/52069-
 
 # Result
 (1) Simple linear system
-[![Everything Is AWESOME](https://img.youtube.com/vi/StTqXEQ2l-Y/0.jpg)](https://www.youtube.com/watch?v=StTqXEQ2l-Y "Everything Is AWESOME")
-
+  - https://youtu.be/3l3JnmAX3to  (for single shooting)
+  - https://youtu.be/8XM5ZEnpmEI  (for multiple shooting (50))
+  
+(2) 
+  
 ps. Maybe this code is not perfect. So, if you find some bugs in this code, plz send to me by mail (ggory15@snu.ac.kr)
 
 [1] A Family of Iterative Gauss-Newton Shooting Methods for Nonlinear Optimal Control
